@@ -21,7 +21,7 @@ legislators, and federal legislators. Built to be dropped onto
 
 ## Requirements
 
-- Node 20.19+ or 22.12+ (Vite requirement)
+- Node 24 LTS or later
 - An **OpenStates API key** — [register at open.pluralpolicy.com](https://open.pluralpolicy.com) (free tier available)
 - A **Google Maps API key** with the **Geocoding API** enabled — required for
   address resolution and the optional map picker
