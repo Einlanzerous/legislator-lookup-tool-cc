@@ -56,6 +56,10 @@
   body,
   #app {
     height: 100%;
+  }
+
+  html,
+  body {
     @apply antialiased text-slate-900;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }

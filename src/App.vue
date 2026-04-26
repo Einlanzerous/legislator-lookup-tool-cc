@@ -7,8 +7,7 @@ import LoadingSpinner from './components/LoadingSpinner.vue'
 import ErrorMessage from './components/ErrorMessage.vue'
 import MapPicker from './components/MapPicker.vue'
 import { lookupRepresentatives } from './services/civicApi'
-import { CivicApiError } from './types'
-import type { LookupResult } from './types'
+import { CivicApiError, type LookupResult } from './types'
 
 const openStatesKey = import.meta.env.VITE_OPENSTATES_API_KEY
 const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
@@ -18,7 +17,7 @@ const loading = ref(false)
 const result = ref<LookupResult | null>(null)
 const error = ref<{ message: string; hint?: string } | null>(null)
 const showMap = ref(false)
-const isDark = ref(false)
+const isDark = ref(localStorage.getItem('theme') === 'dark')
 
 let currentRequest: AbortController | null = null
 
@@ -27,6 +26,7 @@ const canShowMap = computed(() => !!mapsKey)
 function toggleDark() {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
 }
 
 async function runLookup() {

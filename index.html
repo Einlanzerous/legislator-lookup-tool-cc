@@ -9,6 +9,8 @@
     <title>Find Your Elected Officials — Strong Towns Chicago</title>
     <meta name="description" content="Enter a Chicago address to see your Alderman, State, and Federal representatives." />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- Apply saved theme before first paint to prevent flash. -->
+    <script>if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')</script>
   </head>
   <body>
     <div id="app"></div>
