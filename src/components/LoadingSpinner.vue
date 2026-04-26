@@ -3,7 +3,7 @@ defineProps<{ label?: string }>()
 </script>
 
 <template>
-  <div class="flex items-center gap-3 text-slate-600" role="status" aria-live="polite">
+  <div class="flex items-center gap-3 text-slate-600 dark:text-slate-400" role="status" aria-live="polite">
     <svg
       class="h-5 w-5 animate-spin text-brand-600"
       viewBox="0 0 24 24"

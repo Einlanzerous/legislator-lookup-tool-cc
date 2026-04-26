@@ -11,17 +11,18 @@ defineProps<{ group: RepGroup; highlight?: boolean }>()
       <div>
         <h2
           :id="`group-${group.category}`"
-          class="text-sm font-semibold uppercase tracking-wide text-slate-500"
+          class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
         >
           {{ group.title }}
         </h2>
-        <p v-if="group.subtitle" class="text-lg font-semibold text-brand-800 mt-0.5">
+        <p v-if="group.subtitle" class="text-lg font-semibold text-brand-800 dark:text-brand-300 mt-0.5">
           {{ group.subtitle }}
         </p>
       </div>
       <span
         v-if="highlight"
-        class="stc-chip bg-accent-100 text-accent-800 ring-1 ring-accent-300/60"
+        class="stc-chip bg-accent-100 text-accent-800 ring-1 ring-accent-300/60
+               dark:bg-accent-800/30 dark:text-accent-300 dark:ring-accent-600/40"
       >
         Most local
       </span>

@@ -100,12 +100,12 @@ async function handlePick(latlng: L.LatLng) {
   <div class="space-y-3">
     <div
       ref="mapEl"
-      class="h-72 sm:h-80 w-full rounded-xl ring-1 ring-slate-200 bg-slate-100"
+      class="h-72 sm:h-80 w-full rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 bg-slate-100 dark:bg-slate-800"
       role="application"
       aria-label="Map of Chicago. Drag the pin or tap to pick an address."
     />
-    <div class="flex items-start gap-2 text-xs text-slate-600">
-      <MapPinned class="h-4 w-4 mt-0.5 text-brand-600 flex-shrink-0" aria-hidden="true" />
+    <div class="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+      <MapPinned class="h-4 w-4 mt-0.5 text-brand-600 dark:text-brand-400 flex-shrink-0" aria-hidden="true" />
       <p v-if="status === 'idle' && !pickedAddress">
         Drag the pin or tap the map to select an address within Chicago.
       </p>
@@ -116,8 +116,8 @@ async function handlePick(latlng: L.LatLng) {
       <p v-else-if="status === 'error'" class="text-alert-700">
         Couldn't reverse geocode that location. Try another spot.
       </p>
-      <p v-else-if="pickedAddress" class="text-slate-700">
-        Picked: <span class="font-medium text-slate-900">{{ pickedAddress }}</span>
+      <p v-else-if="pickedAddress" class="text-slate-700 dark:text-slate-300">
+        Picked: <span class="font-medium text-slate-900 dark:text-slate-100">{{ pickedAddress }}</span>
       </p>
     </div>
   </div>

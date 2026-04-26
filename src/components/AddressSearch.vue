@@ -74,7 +74,7 @@ function onSubmit(e: Event) {
         </button>
       </div>
     </div>
-    <p class="mt-2 text-xs text-slate-500 pl-1">
+    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400 pl-1">
       Chicago addresses only — you don't need to add the city or state.
     </p>
   </form>

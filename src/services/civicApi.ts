@@ -1,66 +1,142 @@
-import type {
-  CivicApiOffice,
-  CivicApiOfficial,
-  CivicApiResponse,
-  LookupResult,
-  RepCategory,
-  RepGroup,
-  Representative
-} from '../types'
+import type { LookupResult, RepCategory, RepGroup, Representative } from '../types'
+import { CivicApiError } from '../types'
+import { forwardGeocode } from './geocoding'
 
-const CIVIC_ENDPOINT =
-  'https://www.googleapis.com/civicinfo/v2/representatives'
+// ─── Endpoints ───────────────────────────────────────────────────────────────
 
-// Channel type -> URL builder for the three networks the API commonly returns.
-const SOCIAL_URL: Record<string, (id: string) => string> = {
-  Facebook: (id) => `https://facebook.com/${id}`,
-  Twitter: (id) => `https://twitter.com/${id}`,
-  YouTube: (id) => `https://youtube.com/${id}`
+const OPENSTATES_ENDPOINT = 'https://v3.openstates.org/people.geo'
+const CHICAGO_WARDS_ENDPOINT = 'https://data.cityofchicago.org/resource/p293-wvbd.json'
+const CHICAGO_ALDERMEN_ENDPOINT = 'https://data.cityofchicago.org/resource/htai-wnw4.json'
+
+export { CivicApiError }
+
+// ─── OpenStates types ─────────────────────────────────────────────────────────
+
+interface OSCurrentRole {
+  title: string
+  org_classification: 'upper' | 'lower' | 'legislature' | 'executive' | 'government'
+  district: string | number
+  division_id: string
 }
 
-export class CivicApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status?: number,
-    public readonly hint?: string
-  ) {
-    super(message)
-    this.name = 'CivicApiError'
+interface OSOffice {
+  classification: string
+  voice?: string
+  fax?: string
+  address?: string
+  email?: string
+}
+
+interface OSLink {
+  url: string
+  note?: string
+}
+
+interface OSPerson {
+  id: string
+  name: string
+  party: string
+  image?: string
+  email?: string
+  current_role?: OSCurrentRole
+  jurisdiction: {
+    id: string
+    name: string
+    classification: string
   }
+  offices?: OSOffice[]
+  links?: OSLink[]
 }
+
+// ─── Chicago Data Portal types ────────────────────────────────────────────────
+
+interface ChicagoWard {
+  ward: string
+}
+
+interface ChicagoAlderman {
+  ward: string
+  alderman: string
+  ward_phone?: string
+  email?: string
+  website?: string
+  photo_link?: string
+}
+
+// ─── Main export ─────────────────────────────────────────────────────────────
 
 /**
- * Fetch representatives for a Chicago street address.
+ * Look up representatives for a Chicago street address.
  *
- * The user only types a street address; we append ", Chicago, IL" before
- * hitting Google. Results are categorized into the five display groups
- * (Alderman → State Senate → State House → US Senate → US House) and
- * returned in that order. The US President and other executive roles are
- * filtered out — this tool is specifically about legislators + aldermen.
+ * Combines three data sources:
+ *   - Google Geocoding API: address → lat/lng
+ *   - OpenStates /people.geo: state (IL) + federal legislators
+ *   - Chicago Data Portal: ward number + alderman contact info
+ *
+ * Returns the five display groups in order: Alderman → IL Senate → IL House
+ * → US Senate → US House. Groups with no results are omitted.
  */
 export async function lookupRepresentatives(
   streetAddress: string,
-  apiKey: string,
+  openStatesKey: string,
+  mapsKey: string,
   signal?: AbortSignal
 ): Promise<LookupResult> {
   const trimmed = streetAddress.trim()
-  if (!trimmed) {
-    throw new CivicApiError('Please enter an address.')
-  }
-  if (!apiKey) {
+  if (!trimmed) throw new CivicApiError('Please enter an address.')
+
+  if (!openStatesKey) {
     throw new CivicApiError(
-      'Civic API key is not configured.',
+      'OpenStates API key is not configured.',
       undefined,
-      'Set VITE_GOOGLE_CIVIC_API_KEY in .env.local and restart the dev server.'
+      'Set VITE_OPENSTATES_API_KEY in .env.local and restart the dev server.'
+    )
+  }
+  if (!mapsKey) {
+    throw new CivicApiError(
+      'Google Maps API key is not configured.',
+      undefined,
+      'Set VITE_GOOGLE_MAPS_API_KEY in .env.local and restart the dev server.'
     )
   }
 
-  const fullAddress = appendChicago(trimmed)
-  const url = new URL(CIVIC_ENDPOINT)
-  url.searchParams.set('address', fullAddress)
-  url.searchParams.set('key', apiKey)
-  // Don't pass roles/levels — we want the full set and will filter locally,
-  // because the Chicago Alderman doesn't always match a single role cleanly.
+  // Step 1: Resolve address to coordinates.
+  const { lat, lng, formattedAddress } = await forwardGeocode(
+    appendChicago(trimmed),
+    mapsKey,
+    signal
+  )
+
+  // Step 2: Fetch state/federal legislators and ward number in parallel.
+  const [osPersons, wardNumber] = await Promise.all([
+    fetchOpenStates(lat, lng, openStatesKey, signal),
+    fetchWardNumber(lat, lng, signal)
+  ])
+
+  // Step 3: Fetch alderman by ward (sequential — depends on ward number).
+  const alderman = wardNumber ? await fetchAlderman(wardNumber, signal) : null
+
+  return {
+    normalizedAddress: formattedAddress,
+    groups: buildGroups(osPersons, alderman, wardNumber)
+  }
+}
+
+// ─── OpenStates ───────────────────────────────────────────────────────────────
+
+async function fetchOpenStates(
+  lat: number,
+  lng: number,
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<OSPerson[]> {
+  const url = new URL(OPENSTATES_ENDPOINT)
+  url.searchParams.set('lat', String(lat))
+  url.searchParams.set('lng', String(lng))
+  // Request extended fields. Repeated `include` params per the OpenStates spec.
+  url.searchParams.append('include', 'offices')
+  url.searchParams.append('include', 'links')
+  url.searchParams.set('apikey', apiKey)
 
   let res: Response
   try {
@@ -68,49 +144,141 @@ export async function lookupRepresentatives(
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw err
     throw new CivicApiError(
-      'Network error contacting the Civic Information API.',
+      'Network error contacting OpenStates.',
       undefined,
       'Check your internet connection and try again.'
     )
   }
 
-  const data = (await res.json().catch(() => ({}))) as CivicApiResponse
+  const data = (await res.json().catch(() => ({}))) as { results?: OSPerson[]; detail?: string }
 
-  if (!res.ok || data.error) {
-    const msg = data.error?.message || `Request failed (${res.status}).`
-    let hint: string | undefined
-    if (res.status === 400) hint = 'The address might not be recognized. Try adding a unit number or check for typos.'
-    if (res.status === 403) hint = 'The Civic API key is missing, invalid, or restricted.'
-    if (res.status === 404) hint = 'No representatives were found for that address.'
+  if (!res.ok) {
+    const msg = data.detail || `OpenStates API error (${res.status}).`
+    const hint =
+      res.status === 401 || res.status === 403
+        ? 'Check your VITE_OPENSTATES_API_KEY at open.pluralpolicy.com.'
+        : undefined
     throw new CivicApiError(msg, res.status, hint)
   }
 
-  const groups = categorize(data.offices ?? [], data.officials ?? [])
-  const normalizedAddress = formatNormalized(data) || fullAddress
-
-  return { normalizedAddress, groups }
+  return data.results ?? []
 }
 
-function appendChicago(address: string): string {
-  const lower = address.toLowerCase()
-  const hasChicago = lower.includes('chicago')
-  const hasState = /\bil\b|illinois/.test(lower)
-  if (hasChicago && hasState) return address
-  if (hasChicago) return `${address}, IL`
-  return `${address}, Chicago, IL`
+// ─── Chicago Data Portal ──────────────────────────────────────────────────────
+
+async function fetchWardNumber(
+  lat: number,
+  lng: number,
+  signal?: AbortSignal
+): Promise<string | null> {
+  const url = new URL(CHICAGO_WARDS_ENDPOINT)
+  // Socrata WKT: longitude comes first in POINT(lng lat).
+  url.searchParams.set('$where', `intersects(the_geom, 'POINT (${lng} ${lat})')`)
+  url.searchParams.set('$select', 'ward')
+  url.searchParams.set('$limit', '1')
+
+  try {
+    const res = await fetch(url.toString(), { signal })
+    if (!res.ok) return null
+    const data: ChicagoWard[] = await res.json().catch(() => [])
+    return data[0]?.ward ?? null
+  } catch {
+    return null
+  }
 }
 
-function formatNormalized(data: CivicApiResponse): string {
-  const n = data.normalizedInput
-  if (!n) return ''
-  return [n.line1, n.city, [n.state, n.zip].filter(Boolean).join(' ')]
-    .filter(Boolean)
-    .join(', ')
+async function fetchAlderman(
+  ward: string,
+  signal?: AbortSignal
+): Promise<ChicagoAlderman | null> {
+  const url = new URL(CHICAGO_ALDERMEN_ENDPOINT)
+  url.searchParams.set('ward', ward)
+  url.searchParams.set('$limit', '1')
+
+  try {
+    const res = await fetch(url.toString(), { signal })
+    if (!res.ok) return null
+    const data: ChicagoAlderman[] = await res.json().catch(() => [])
+    return data[0] ?? null
+  } catch {
+    return null
+  }
 }
 
-function categorize(
-  offices: CivicApiOffice[],
-  officials: CivicApiOfficial[]
+// ─── Categorization & mapping ─────────────────────────────────────────────────
+
+function classifyPerson(person: OSPerson): RepCategory | null {
+  const role = person.current_role
+  if (!role) return null
+
+  const jId = person.jurisdiction.id
+  const isIllinois = jId.includes('/state:il/')
+  // Federal: OCD ID has no /state:XX/ segment.
+  const isFederal = !jId.includes('/state:')
+
+  if (isIllinois) {
+    if (role.org_classification === 'upper') return 'stateSenate'
+    if (role.org_classification === 'lower') return 'stateHouse'
+    return null
+  }
+
+  if (isFederal) {
+    if (role.org_classification === 'upper') return 'usSenate'
+    if (role.org_classification === 'lower') return 'usHouse'
+    return null
+  }
+
+  return null
+}
+
+function personToRep(person: OSPerson): Representative {
+  const phone = person.offices?.find((o) => o.voice)?.voice
+  const email = person.email || person.offices?.find((o) => o.email)?.email
+  const website = person.links?.[0]?.url
+
+  const district = person.current_role?.district
+  const title = person.current_role?.title ?? ''
+  const officeName = district ? `${title} — District ${district}` : title
+
+  return {
+    id: person.id,
+    name: person.name,
+    officeName,
+    party: person.party || undefined,
+    phone,
+    email,
+    website,
+    photoUrl: person.image || undefined,
+    socials: []
+  }
+}
+
+function aldermanToRep(a: ChicagoAlderman, ward: string): Representative {
+  // Dataset stores name as "LastName, FirstName" — normalize to "First Last".
+  const name = a.alderman.includes(',')
+    ? a.alderman
+        .split(',')
+        .map((s) => s.trim())
+        .reverse()
+        .join(' ')
+    : a.alderman
+
+  return {
+    id: `chicago-ward-${ward}`,
+    name,
+    officeName: `Ward ${ward} Alderperson`,
+    phone: a.ward_phone,
+    email: a.email,
+    website: a.website,
+    photoUrl: a.photo_link,
+    socials: []
+  }
+}
+
+function buildGroups(
+  osPersons: OSPerson[],
+  alderman: ChicagoAlderman | null,
+  wardNumber: string | null
 ): RepGroup[] {
   const buckets: Record<RepCategory, Representative[]> = {
     alderman: [],
@@ -119,27 +287,18 @@ function categorize(
     usSenate: [],
     usHouse: []
   }
-  // Keep a subtitle for the Alderman group since it encodes the ward number.
-  let aldermanSubtitle: string | undefined
 
-  for (const office of offices) {
-    const category = classifyOffice(office)
-    if (!category) continue
+  if (alderman && wardNumber) {
+    buckets.alderman.push(aldermanToRep(alderman, wardNumber))
+  }
 
-    if (category === 'alderman') {
-      const ward = extractWard(office.name, office.divisionId)
-      if (ward) aldermanSubtitle = `Ward ${ward}`
-    }
-
-    for (const idx of office.officialIndices) {
-      const official = officials[idx]
-      if (!official) continue
-      buckets[category].push(toRepresentative(official, office))
-    }
+  for (const person of osPersons) {
+    const category = classifyPerson(person)
+    if (category) buckets[category].push(personToRep(person))
   }
 
   const order: Array<{ category: RepCategory; title: string; subtitle?: string }> = [
-    { category: 'alderman', title: 'Ward Alderman', subtitle: aldermanSubtitle },
+    { category: 'alderman', title: 'Ward Alderperson', subtitle: wardNumber ? `Ward ${wardNumber}` : undefined },
     { category: 'stateSenate', title: 'Illinois State Senate' },
     { category: 'stateHouse', title: 'Illinois State House' },
     { category: 'usSenate', title: 'U.S. Senate' },
@@ -153,73 +312,16 @@ function categorize(
       subtitle,
       reps: buckets[category]
     }))
-    .filter((group) => group.reps.length > 0)
+    .filter((g) => g.reps.length > 0)
 }
 
-function classifyOffice(office: CivicApiOffice): RepCategory | null {
-  const levels = new Set(office.levels ?? [])
-  const roles = new Set(office.roles ?? [])
-  const name = office.name.toLowerCase()
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  // Ward Alderman — matches by name since Chicago's city council sits under
-  // a locality level but also occasionally under administrativeArea2.
-  const isAlderman =
-    /\balder(man|woman|person)\b/.test(name) ||
-    /\bcity council\b/.test(name) ||
-    /ward \d+/.test(name)
-  if (isAlderman && (levels.has('locality') || levels.has('administrativeArea2') || levels.size === 0)) {
-    return 'alderman'
-  }
-
-  // Federal legislators — exclude the President/VP and any executive role.
-  if (levels.has('country')) {
-    if (roles.has('headOfGovernment') || roles.has('headOfState') || roles.has('deputyHeadOfGovernment')) {
-      return null
-    }
-    if (roles.has('legislatorUpperBody')) return 'usSenate'
-    if (roles.has('legislatorLowerBody')) return 'usHouse'
-    return null
-  }
-
-  // State legislators (Illinois).
-  if (levels.has('administrativeArea1')) {
-    if (roles.has('legislatorUpperBody')) return 'stateSenate'
-    if (roles.has('legislatorLowerBody')) return 'stateHouse'
-    return null
-  }
-
-  return null
-}
-
-function extractWard(officeName: string, divisionId: string): string | null {
-  const m1 = officeName.match(/ward\s*(\d+)/i)
-  if (m1) return m1[1]
-  const m2 = divisionId.match(/ward:(\d+)/i)
-  if (m2) return m2[1]
-  return null
-}
-
-function toRepresentative(
-  o: CivicApiOfficial,
-  office: CivicApiOffice
-): Representative {
-  const socials = (o.channels ?? [])
-    .map((c) => {
-      const build = SOCIAL_URL[c.type]
-      if (!build) return null
-      return { type: c.type, id: c.id, url: build(c.id) }
-    })
-    .filter((x): x is { type: string; id: string; url: string } => x !== null)
-
-  return {
-    id: `${office.divisionId}::${o.name}`,
-    name: o.name,
-    officeName: office.name,
-    party: o.party,
-    phone: o.phones?.[0],
-    email: o.emails?.[0],
-    website: o.urls?.[0],
-    photoUrl: o.photoUrl,
-    socials
-  }
+function appendChicago(address: string): string {
+  const lower = address.toLowerCase()
+  const hasChicago = lower.includes('chicago')
+  const hasState = /\bil\b|illinois/.test(lower)
+  if (hasChicago && hasState) return address
+  if (hasChicago) return `${address}, IL`
+  return `${address}, Chicago, IL`
 }

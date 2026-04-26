@@ -1,41 +1,12 @@
-// Shape of the Google Civic Information API response we actually care about.
-// Trimmed to just the fields this app consumes.
-export interface CivicApiOfficial {
-  name: string
-  address?: Array<{
-    line1?: string
-    line2?: string
-    line3?: string
-    city?: string
-    state?: string
-    zip?: string
-  }>
-  party?: string
-  phones?: string[]
-  urls?: string[]
-  photoUrl?: string
-  emails?: string[]
-  channels?: Array<{ type: string; id: string }>
-}
-
-export interface CivicApiOffice {
-  name: string
-  divisionId: string
-  levels?: string[]
-  roles?: string[]
-  officialIndices: number[]
-}
-
-export interface CivicApiResponse {
-  normalizedInput?: {
-    line1?: string
-    city?: string
-    state?: string
-    zip?: string
+export class CivicApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly hint?: string
+  ) {
+    super(message)
+    this.name = 'CivicApiError'
   }
-  offices?: CivicApiOffice[]
-  officials?: CivicApiOfficial[]
-  error?: { code: number; message: string }
 }
 
 // Normalized representative record used throughout the UI.

@@ -7,7 +7,7 @@ declare module '*.vue' {
 }
 
 interface ImportMetaEnv {
-  readonly VITE_GOOGLE_CIVIC_API_KEY: string
+  readonly VITE_OPENSTATES_API_KEY: string
   readonly VITE_GOOGLE_MAPS_API_KEY: string
 }
 

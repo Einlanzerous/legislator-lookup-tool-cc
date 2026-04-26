@@ -13,7 +13,7 @@ const initials = computed(() => {
 
 <template>
   <div
-    class="flex items-center justify-center rounded-full bg-brand-100 text-brand-800 font-semibold select-none"
+    class="flex items-center justify-center rounded-full bg-brand-100 text-brand-800 dark:bg-brand-800/50 dark:text-brand-300 font-semibold select-none"
     aria-hidden="true"
   >
     {{ initials }}
