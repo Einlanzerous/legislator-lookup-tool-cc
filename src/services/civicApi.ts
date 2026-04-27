@@ -4,7 +4,7 @@ import { forwardGeocode } from './geocoding'
 
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
-const OPENSTATES_ENDPOINT = 'https://v3.openstates.org/people.geo'
+const WORKER_URL = import.meta.env.VITE_WORKER_URL
 const CHICAGO_WARDS_ENDPOINT = 'https://data.cityofchicago.org/resource/p293-wvbd.json'
 const CHICAGO_ALDERMEN_ENDPOINT = 'https://data.cityofchicago.org/resource/htai-wnw4.json'
 
@@ -68,49 +68,36 @@ interface ChicagoAlderman {
 /**
  * Look up representatives for a Chicago street address.
  *
- * Combines three data sources:
- *   - Google Geocoding API: address → lat/lng
- *   - OpenStates /people.geo: state (IL) + federal legislators
- *   - Chicago Data Portal: ward number + alderman contact info
+ * Combines three data sources (all API keys stay server-side in the Worker):
+ *   - Geocoding proxy  → address → lat/lng
+ *   - OpenStates proxy → state (IL) + federal legislators
+ *   - Chicago Data Portal (public) → ward number + alderman contact info
  *
- * Returns the five display groups in order: Alderman → IL Senate → IL House
- * → US Senate → US House. Groups with no results are omitted.
+ * Returns groups in order: Alderman → IL Senate → IL House → US Senate → US House.
+ * Groups with no results are omitted.
  */
 export async function lookupRepresentatives(
   streetAddress: string,
-  openStatesKey: string,
-  mapsKey: string,
   signal?: AbortSignal
 ): Promise<LookupResult> {
   const trimmed = streetAddress.trim()
   if (!trimmed) throw new CivicApiError('Please enter an address.')
 
-  if (!openStatesKey) {
+  if (!WORKER_URL) {
     throw new CivicApiError(
-      'OpenStates API key is not configured.',
+      'Worker URL is not configured.',
       undefined,
-      'Set VITE_OPENSTATES_API_KEY in .env.local and restart the dev server.'
-    )
-  }
-  if (!mapsKey) {
-    throw new CivicApiError(
-      'Google Maps API key is not configured.',
-      undefined,
-      'Set VITE_GOOGLE_MAPS_API_KEY in .env.local and restart the dev server.'
+      'Set VITE_WORKER_URL in .env.local and restart the dev server.'
     )
   }
 
   // Step 1: Resolve address to coordinates.
-  const { lat, lng, formattedAddress } = await forwardGeocode(
-    appendChicago(trimmed),
-    mapsKey,
-    signal
-  )
+  const { lat, lng, formattedAddress } = await forwardGeocode(appendChicago(trimmed), signal)
 
   // Step 2: Fetch state/federal legislators and ward number in parallel.
   const [osPersons, wardNumber] = await Promise.all([
-    fetchOpenStates(lat, lng, openStatesKey, signal),
-    fetchWardNumber(lat, lng, signal)
+    fetchOpenStates(lat, lng, signal),
+    fetchWardNumber(lat, lng, signal),
   ])
 
   // Step 3: Fetch alderman by ward (sequential — depends on ward number).
@@ -118,25 +105,23 @@ export async function lookupRepresentatives(
 
   return {
     normalizedAddress: formattedAddress,
-    groups: buildGroups(osPersons, alderman, wardNumber)
+    groups: buildGroups(osPersons, alderman, wardNumber),
   }
 }
 
-// ─── OpenStates ───────────────────────────────────────────────────────────────
+// ─── OpenStates (via Worker proxy) ───────────────────────────────────────────
 
 async function fetchOpenStates(
   lat: number,
   lng: number,
-  apiKey: string,
   signal?: AbortSignal
 ): Promise<OSPerson[]> {
-  const url = new URL(OPENSTATES_ENDPOINT)
+  const url = new URL(`${WORKER_URL}/openstates`)
   url.searchParams.set('lat', String(lat))
   url.searchParams.set('lng', String(lng))
-  // Request extended fields. Repeated `include` params per the OpenStates spec.
+  // Repeated `include` params per the OpenStates spec.
   url.searchParams.append('include', 'offices')
   url.searchParams.append('include', 'links')
-  url.searchParams.set('apikey', apiKey)
 
   let res: Response
   try {
@@ -156,7 +141,7 @@ async function fetchOpenStates(
     const msg = data.detail || `OpenStates API error (${res.status}).`
     const hint =
       res.status === 401 || res.status === 403
-        ? 'Check your VITE_OPENSTATES_API_KEY at open.pluralpolicy.com.'
+        ? 'Check the OPENSTATES_KEY Worker secret at dash.cloudflare.com.'
         : undefined
     throw new CivicApiError(msg, res.status, hint)
   }
@@ -164,7 +149,7 @@ async function fetchOpenStates(
   return data.results ?? []
 }
 
-// ─── Chicago Data Portal ──────────────────────────────────────────────────────
+// ─── Chicago Data Portal (public, no proxy needed) ───────────────────────────
 
 async function fetchWardNumber(
   lat: number,
@@ -249,18 +234,14 @@ function personToRep(person: OSPerson): Representative {
     email,
     website,
     photoUrl: person.image || undefined,
-    socials: []
+    socials: [],
   }
 }
 
 function aldermanToRep(a: ChicagoAlderman, ward: string): Representative {
   // Dataset stores name as "LastName, FirstName" — normalize to "First Last".
   const name = a.alderman.includes(',')
-    ? a.alderman
-        .split(',')
-        .map((s) => s.trim())
-        .reverse()
-        .join(' ')
+    ? a.alderman.split(',').map((s) => s.trim()).reverse().join(' ')
     : a.alderman
 
   return {
@@ -271,7 +252,7 @@ function aldermanToRep(a: ChicagoAlderman, ward: string): Representative {
     email: a.email,
     website: a.website,
     photoUrl: a.photo_link,
-    socials: []
+    socials: [],
   }
 }
 
@@ -285,7 +266,7 @@ function buildGroups(
     stateSenate: [],
     stateHouse: [],
     usSenate: [],
-    usHouse: []
+    usHouse: [],
   }
 
   if (alderman && wardNumber) {
@@ -302,7 +283,7 @@ function buildGroups(
     { category: 'stateSenate', title: 'Illinois State Senate' },
     { category: 'stateHouse', title: 'Illinois State House' },
     { category: 'usSenate', title: 'U.S. Senate' },
-    { category: 'usHouse', title: 'U.S. House of Representatives' }
+    { category: 'usHouse', title: 'U.S. House of Representatives' },
   ]
 
   return order
@@ -310,7 +291,7 @@ function buildGroups(
       category,
       title,
       subtitle,
-      reps: buckets[category]
+      reps: buckets[category],
     }))
     .filter((g) => g.reps.length > 0)
 }

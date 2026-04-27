@@ -1,10 +1,10 @@
-// Wrappers around Google's Geocoding REST API.
+// Wrappers around the geocoding proxy Worker.
 // reverseGeocode: used by MapPicker to turn a dragged pin into a street address.
 // forwardGeocode: used by civicApi to resolve a typed address to lat/lng.
 
 import { CivicApiError } from '../types'
 
-const GEOCODE_ENDPOINT = 'https://maps.googleapis.com/maps/api/geocode/json'
+const WORKER_URL = import.meta.env.VITE_WORKER_URL
 
 export interface ReverseGeocodeResult {
   formattedAddress: string
@@ -21,14 +21,12 @@ export interface ForwardGeocodeResult {
 export async function reverseGeocode(
   lat: number,
   lng: number,
-  apiKey: string,
   signal?: AbortSignal
 ): Promise<ReverseGeocodeResult | null> {
-  if (!apiKey) return null
+  if (!WORKER_URL) return null
 
-  const url = new URL(GEOCODE_ENDPOINT)
+  const url = new URL(`${WORKER_URL}/geocode`)
   url.searchParams.set('latlng', `${lat},${lng}`)
-  url.searchParams.set('key', apiKey)
   url.searchParams.set('result_type', 'street_address')
 
   const res = await fetch(url.toString(), { signal })
@@ -48,18 +46,16 @@ export async function reverseGeocode(
   return {
     formattedAddress: top.formatted_address,
     streetAddress: streetAddress || top.formatted_address,
-    isChicago: city?.toLowerCase() === 'chicago'
+    isChicago: city?.toLowerCase() === 'chicago',
   }
 }
 
 export async function forwardGeocode(
   address: string,
-  apiKey: string,
   signal?: AbortSignal
 ): Promise<ForwardGeocodeResult> {
-  const url = new URL(GEOCODE_ENDPOINT)
+  const url = new URL(`${WORKER_URL}/geocode`)
   url.searchParams.set('address', address)
-  url.searchParams.set('key', apiKey)
 
   let res: Response
   try {
@@ -77,16 +73,10 @@ export async function forwardGeocode(
 
   if (!res.ok || data.status === 'REQUEST_DENIED') {
     const googleMsg: string = data.error_message ?? data.status ?? ''
-    const isReferrerIssue = googleMsg.toLowerCase().includes('referer')
-    const hint = isReferrerIssue
-      ? 'Your API key has HTTP referrer restrictions, which block the Geocoding REST API. ' +
-        'In Google Cloud Console, either remove referrer restrictions from this key or ' +
-        'create a separate unrestricted key for server-side geocoding.'
-      : 'Ensure the Geocoding API is enabled for your project and that VITE_GOOGLE_MAPS_API_KEY is correct.'
     throw new CivicApiError(
       googleMsg ? `Google Maps API: ${googleMsg}` : 'Google Maps API error.',
       res.status,
-      hint
+      'Ensure the Geocoding API is enabled for your Google project.'
     )
   }
 

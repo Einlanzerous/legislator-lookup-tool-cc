@@ -9,8 +9,7 @@ import MapPicker from './components/MapPicker.vue'
 import { lookupRepresentatives } from './services/civicApi'
 import { CivicApiError, type LookupResult } from './types'
 
-const openStatesKey = import.meta.env.VITE_OPENSTATES_API_KEY
-const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+const workerUrl = import.meta.env.VITE_WORKER_URL
 
 const address = ref('')
 const loading = ref(false)
@@ -21,7 +20,7 @@ const isDark = ref(localStorage.getItem('theme') === 'dark')
 
 let currentRequest: AbortController | null = null
 
-const canShowMap = computed(() => !!mapsKey)
+const canShowMap = computed(() => !!workerUrl)
 
 function toggleDark() {
   isDark.value = !isDark.value
@@ -40,8 +39,6 @@ async function runLookup() {
   try {
     result.value = await lookupRepresentatives(
       address.value,
-      openStatesKey,
-      mapsKey,
       currentRequest.signal
     )
   } catch (err) {

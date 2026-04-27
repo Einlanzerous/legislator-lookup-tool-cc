@@ -1,0 +1,8 @@
+name = "stc-legislator-lookup"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# Secrets (never put real values here — set them with `wrangler secret put`):
+#   GOOGLE_MAPS_KEY
+#   OPENSTATES_KEY
+#   ALLOWED_ORIGIN   (optional, e.g. "https://www.strongtownschicago.org")

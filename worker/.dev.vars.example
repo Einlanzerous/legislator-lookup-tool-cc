@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored) and fill in your keys for local Worker development.
+# Run `npm run dev` in this directory to start the Worker at http://localhost:8787.
+GOOGLE_MAPS_KEY=your_google_maps_api_key_here
+OPENSTATES_KEY=your_openstates_api_key_here
+# ALLOWED_ORIGIN=http://localhost:5173   # optional for local dev

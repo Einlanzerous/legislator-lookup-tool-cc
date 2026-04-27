@@ -15,8 +15,6 @@ const CHICAGO_BOUNDS: L.LatLngBoundsLiteral = [
   [42.023, -87.5237]
 ]
 
-const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-
 const mapEl = ref<HTMLDivElement | null>(null)
 const map = shallowRef<L.Map | null>(null)
 const marker = shallowRef<L.Marker | null>(null)
@@ -71,12 +69,7 @@ async function handlePick(latlng: L.LatLng) {
   lastReq = new AbortController()
   status.value = 'locating'
   try {
-    const result = await reverseGeocode(
-      latlng.lat,
-      latlng.lng,
-      mapsKey,
-      lastReq.signal
-    )
+    const result = await reverseGeocode(latlng.lat, latlng.lng, lastReq.signal)
     if (!result) {
       status.value = 'error'
       return
