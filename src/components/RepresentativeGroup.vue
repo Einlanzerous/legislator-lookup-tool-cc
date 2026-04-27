@@ -6,7 +6,7 @@ defineProps<{ group: RepGroup; highlight?: boolean }>()
 </script>
 
 <template>
-  <section :aria-labelledby="`group-${group.category}`">
+  <section :aria-labelledby="`group-${group.category}`" class="flex flex-col h-full">
     <header class="flex items-end justify-between gap-3 mb-3">
       <div>
         <h2
@@ -29,7 +29,7 @@ defineProps<{ group: RepGroup; highlight?: boolean }>()
     </header>
 
     <div
-      class="grid gap-4"
+      class="grid gap-4 flex-1 content-start"
       :class="group.reps.length > 1 ? 'sm:grid-cols-2' : ''"
     >
       <RepresentativeCard v-for="rep in group.reps" :key="rep.id" :rep="rep" />

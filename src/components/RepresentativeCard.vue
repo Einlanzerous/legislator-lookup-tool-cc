@@ -51,7 +51,7 @@ const partyColor = computed(() => {
 
     <ul
       v-if="rep.phone || rep.email || rep.website || rep.socials.length"
-      class="mt-4 space-y-2 text-sm"
+      class="mt-auto pt-4 space-y-2 text-sm"
     >
       <li v-if="rep.phone" class="flex items-center gap-2 text-slate-700 dark:text-slate-300">
         <Phone class="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
