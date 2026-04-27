@@ -47,7 +47,6 @@ async function runLookup() {
     if (err instanceof CivicApiError) {
       error.value = { message: err.message, hint: err.hint }
     } else {
-      console.error('[lookup error]', err)
       error.value = { message: 'Something went wrong looking up that address.' }
     }
   } finally {

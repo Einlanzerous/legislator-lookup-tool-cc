@@ -54,13 +54,16 @@ interface ChicagoWard {
   ward: string
 }
 
+// Socrata URL fields may be a plain string or a {url, description} object.
+type SocrataUrl = string | { url: string; description?: string }
+
 interface ChicagoAlderman {
   ward: string
   alderman: string
   ward_phone?: string
   email?: string
-  website?: string
-  photo_link?: string
+  website?: SocrataUrl
+  photo_link?: SocrataUrl
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
@@ -250,8 +253,8 @@ function aldermanToRep(a: ChicagoAlderman, ward: string): Representative {
     officeName: `Ward ${ward} Alderperson`,
     phone: a.ward_phone,
     email: a.email,
-    website: a.website,
-    photoUrl: a.photo_link,
+    website: extractUrl(a.website),
+    photoUrl: extractUrl(a.photo_link),
     socials: [],
   }
 }
@@ -297,6 +300,12 @@ function buildGroups(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractUrl(value: SocrataUrl | undefined): string | undefined {
+  if (!value) return undefined
+  if (typeof value === 'string') return value || undefined
+  return value.url || undefined
+}
 
 function appendChicago(address: string): string {
   const lower = address.toLowerCase()
