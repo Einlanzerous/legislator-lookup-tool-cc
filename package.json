@@ -1,7 +1,7 @@
 {
   "name": "stc-elected-official-lookup",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Elected Official Lookup for Strong Towns Chicago — enter an address, see your Alderman, State, and Federal reps.",
   "scripts": {
