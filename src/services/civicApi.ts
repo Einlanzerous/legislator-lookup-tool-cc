@@ -219,10 +219,19 @@ function classifyPerson(person: OSPerson): RepCategory | null {
   return null
 }
 
+function pickWebsite(links: OSLink[] | undefined, id: string): string {
+  // Some OpenStates links use old GA-indexed ILGA URLs (e.g. Senator.asp?GA=101)
+  // that no longer resolve correctly. Skip those and fall back to the
+  // OpenStates person page, which is always current.
+  const isStale = (url: string) => /[?&]GA=\d/i.test(url)
+  const good = links?.find((l) => !isStale(l.url))
+  return good?.url ?? `https://openstates.org/person/${id}/`
+}
+
 function personToRep(person: OSPerson): Representative {
   const phone = person.offices?.find((o) => o.voice)?.voice
   const email = person.email || person.offices?.find((o) => o.email)?.email
-  const website = person.links?.[0]?.url
+  const website = pickWebsite(person.links, person.id)
 
   const district = person.current_role?.district
   const title = person.current_role?.title ?? ''

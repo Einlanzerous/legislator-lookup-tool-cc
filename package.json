@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
+    "test:unit": "vitest",
+    "test:e2e": "playwright test",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
@@ -19,9 +21,13 @@
     "@tailwindcss/vite": "^4.2.3",
     "@types/leaflet": "^1.9.21",
     "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/test-utils": "^2.4.6",
+    "@playwright/test": "^1.49.1",
+    "jsdom": "^26.0.0",
     "tailwindcss": "^4.2.3",
     "typescript": "^6.0.3",
     "vite": "^8.0.9",
+    "vitest": "^3.0.5",
     "vue-tsc": "^3.2.7"
   }
 }

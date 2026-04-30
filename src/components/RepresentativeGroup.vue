@@ -29,7 +29,7 @@ defineProps<{ group: RepGroup; highlight?: boolean }>()
     </header>
 
     <div
-      class="grid gap-4 flex-1 content-start"
+      class="grid gap-4 flex-1"
       :class="group.reps.length > 1 ? 'sm:grid-cols-2' : ''"
     >
       <RepresentativeCard v-for="rep in group.reps" :key="rep.id" :rep="rep" />
