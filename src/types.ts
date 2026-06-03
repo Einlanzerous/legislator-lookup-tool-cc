@@ -39,5 +39,8 @@ export interface RepGroup {
 
 export interface LookupResult {
   normalizedAddress: string
+  // Chicago ward number for the address, if resolved. Surfaced prominently in
+  // the UI since it's the primary thing people look up in person.
+  ward?: string | null
   groups: RepGroup[]
 }

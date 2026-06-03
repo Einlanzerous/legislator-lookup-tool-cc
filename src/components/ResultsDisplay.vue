@@ -1,9 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { MapPin } from 'lucide-vue-next'
 import type { LookupResult } from '../types'
 import RepresentativeGroup from './RepresentativeGroup.vue'
+import WardCard from './WardCard.vue'
 
-defineProps<{ result: LookupResult }>()
+const props = defineProps<{ result: LookupResult }>()
+
+const aldermanGroup = computed(() =>
+  props.result.groups.find((g) => g.category === 'alderman')
+)
+const otherGroups = computed(() =>
+  props.result.groups.filter((g) => g.category !== 'alderman')
+)
 </script>
 
 <template>
@@ -21,13 +30,17 @@ defineProps<{ result: LookupResult }>()
       street number and try again, or pick a point on the map.
     </div>
 
+    <WardCard
+      v-if="aldermanGroup && result.ward"
+      :group="aldermanGroup"
+      :ward="result.ward"
+    />
+
     <div class="grid gap-6 lg:grid-cols-2">
       <RepresentativeGroup
-        v-for="(group, idx) in result.groups"
+        v-for="group in otherGroups"
         :key="group.category"
         :group="group"
-        :highlight="idx === 0 && group.category === 'alderman'"
-        :class="idx === 0 && group.category === 'alderman' ? 'lg:col-span-2' : ''"
       />
     </div>
   </div>
