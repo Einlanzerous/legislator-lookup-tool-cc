@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/Einlanzerous/legislator-lookup-tool-cc/compare/v1.0.0...v1.1.0) (2026-06-03)
+
+
+### Features
+
+* polish lookup UI for in-person tablet use (LLT-1) ([415e665](https://github.com/Einlanzerous/legislator-lookup-tool-cc/commit/415e6651f4b1f2a4456679a79dfdcbefa7ac08e3))
+
 ## 1.0.0 (2026-04-30)
 
 
