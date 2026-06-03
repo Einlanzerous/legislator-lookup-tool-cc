@@ -108,6 +108,7 @@ export async function lookupRepresentatives(
 
   return {
     normalizedAddress: formattedAddress,
+    ward: wardNumber,
     groups: buildGroups(osPersons, alderman, wardNumber),
   }
 }

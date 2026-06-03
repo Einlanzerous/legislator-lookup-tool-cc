@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { Search, X } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -15,6 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const local = ref(props.modelValue)
+const inputEl = ref<HTMLInputElement | null>(null)
 
 watch(
   () => props.modelValue,
@@ -22,6 +23,32 @@ watch(
     local.value = v
   }
 )
+
+// Keep the field visible when the on-screen keyboard opens. On tablets —
+// notably Firefox in full-screen — the layout viewport doesn't shrink, so the
+// keyboard can cover the focused input. The visual viewport does shrink, so we
+// pull the field back into view on focus and whenever that viewport resizes
+// while the field is active.
+function scrollInputIntoView() {
+  inputEl.value?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+function onFocus() {
+  // Defer so the keyboard has begun animating in before we scroll.
+  setTimeout(scrollInputIntoView, 300)
+}
+
+function onViewportResize() {
+  if (document.activeElement === inputEl.value) scrollInputIntoView()
+}
+
+onMounted(() => {
+  window.visualViewport?.addEventListener('resize', onViewportResize)
+})
+
+onBeforeUnmount(() => {
+  window.visualViewport?.removeEventListener('resize', onViewportResize)
+})
 
 function onInput(e: Event) {
   const v = (e.target as HTMLInputElement).value
@@ -36,7 +63,7 @@ function onSubmit(e: Event) {
 </script>
 
 <template>
-  <form @submit="onSubmit" class="w-full">
+  <form @submit="onSubmit" class="w-full max-w-2xl mx-auto">
     <label for="stc-address" class="sr-only">Street address</label>
     <div class="relative">
       <Search
@@ -45,11 +72,16 @@ function onSubmit(e: Event) {
       />
       <input
         id="stc-address"
+        ref="inputEl"
         type="text"
         :value="local"
         @input="onInput"
+        @focus="onFocus"
         :disabled="loading"
-        autocomplete="street-address"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
         inputmode="text"
         placeholder="e.g. 121 N LaSalle St"
         class="stc-input pl-11 pr-28 py-4 text-base sm:text-lg"
@@ -74,7 +106,7 @@ function onSubmit(e: Event) {
         </button>
       </div>
     </div>
-    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400 pl-1">
+    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400 text-center">
       Chicago addresses only — you don't need to add the city or state.
     </p>
   </form>
