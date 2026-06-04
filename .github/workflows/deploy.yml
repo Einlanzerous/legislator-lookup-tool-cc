@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
 
+# wrangler reads these natively, so we invoke it directly (and wrap it in a
+# retry) instead of going through cloudflare/wrangler-action.
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
 jobs:
   deploy-worker:
     name: Deploy Worker
@@ -15,14 +21,18 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: worker/package-lock.json
-      - run: npm install
+      - run: npm ci
         working-directory: worker
-      - uses: cloudflare/wrangler-action@v3
+      # Retry to absorb the intermittent "Cloudflare API timed out" failures we
+      # see on the first attempt from the self-hosted runner (LLT-2). wrangler is
+      # a worker devDependency, so --no-install resolves it locally.
+      - name: Deploy Worker
+        uses: nick-fields/retry@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
-          command: deploy
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: cd worker && npx --no-install wrangler deploy
 
   deploy-frontend:
     name: Deploy Frontend
@@ -38,8 +48,12 @@ jobs:
       - run: npm run build
         env:
           VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
-      - uses: cloudflare/wrangler-action@v3
+      # wrangler is now a root devDependency (lockfile-pinned), so --no-install
+      # resolves it locally with no interactive npx install prompt.
+      - name: Deploy Frontend
+        uses: nick-fields/retry@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=stc-legislator-lookup --branch main
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: npx --no-install wrangler pages deploy dist --project-name=stc-legislator-lookup --branch main
