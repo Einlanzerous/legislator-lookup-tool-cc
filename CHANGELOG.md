@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/Einlanzerous/legislator-lookup-tool-cc/compare/v1.1.0...v1.1.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* harden Cloudflare deploy with retries and pinned wrangler (LLT-2) ([52611c6](https://github.com/Einlanzerous/legislator-lookup-tool-cc/commit/52611c676d3ad0047a84c3707d8ca71143db9c15))
+* harden Cloudflare deploy with retries and pinned wrangler (LLT-2) ([3729b2a](https://github.com/Einlanzerous/legislator-lookup-tool-cc/commit/3729b2a183ce84964b2c1fe8f1b523e2c6743858))
+
 ## [1.1.0](https://github.com/Einlanzerous/legislator-lookup-tool-cc/compare/v1.0.0...v1.1.0) (2026-06-03)
 
 
